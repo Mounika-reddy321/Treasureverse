@@ -1,0 +1,6 @@
+{
+  "name": "TreasureVerse — Multi-Game Adventure Platform",
+  "description": "AI-powered fantasy adventure gaming platform with 100 levels each of Treasure Hunt, Art Puzzles, and Arrow Puzzles, unified diamond economy, and daily challenges.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
