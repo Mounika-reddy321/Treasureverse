@@ -48,6 +48,7 @@ export const ArtGamePlay: React.FC<ArtGamePlayProps> = ({
   const [hintStock, setHintStock] = useState<number>(10);
   const [isPeekOpen, setIsPeekOpen] = useState<boolean>(false);
   const [isAIModalOpen, setIsAIModalOpen] = useState<boolean>(false);
+  const [isHowAIWorksOpen, setIsHowAIWorksOpen] = useState<boolean>(false);
 
   // AI Photo Lore state
   const [aiLore, setAiLore] = useState<{ lore: string; strategyTip: string } | null>(null);
@@ -258,14 +259,26 @@ export const ArtGamePlay: React.FC<ArtGamePlayProps> = ({
           <span className="font-semibold text-stone-300">{scene.location}</span>
         </div>
 
-        {/* Reference Pic Thumbnail Button */}
-        <button
-          onClick={() => { sounds.playClick(); setIsPeekOpen(true); }}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-bold transition-all shadow-sm cursor-pointer"
-        >
-          <Eye className="w-3.5 h-3.5" />
-          <span>Reference Photo</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {/* How AI Works Info Button */}
+          <button
+            onClick={() => { sounds.playClick(); setIsHowAIWorksOpen(true); }}
+            className="flex items-center gap-1 px-2 py-1 rounded-xl bg-indigo-950/60 hover:bg-indigo-900/80 border border-indigo-700/60 text-indigo-300 text-xs font-bold transition-all cursor-pointer"
+            title="Learn how AI works in Art Puzzles"
+          >
+            <BrainCircuit className="w-3.5 h-3.5" />
+            <span>How AI Works</span>
+          </button>
+
+          {/* Reference Pic Thumbnail Button */}
+          <button
+            onClick={() => { sounds.playClick(); setIsPeekOpen(true); }}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-bold transition-all shadow-sm cursor-pointer"
+          >
+            <Eye className="w-3.5 h-3.5" />
+            <span>Reference Photo</span>
+          </button>
+        </div>
       </div>
 
       {/* 3. Main Real Photo Jigsaw Board */}
@@ -437,6 +450,83 @@ export const ArtGamePlay: React.FC<ArtGamePlayProps> = ({
         currentGame="Art Puzzles"
         currentLevel={level.level}
       />
+
+      {/* How AI Works Educational Modal */}
+      {isHowAIWorksOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-stone-950/85 backdrop-blur-md animate-fade-in" onClick={() => setIsHowAIWorksOpen(false)} />
+
+          <div className="relative w-full max-w-lg bg-gradient-to-b from-stone-900 via-stone-900 to-stone-950 border-2 border-indigo-500/50 rounded-3xl p-6 sm:p-7 shadow-2xl shadow-indigo-500/20 z-10 animate-scale-up text-left">
+            <div className="flex items-center justify-between pb-4 mb-4 border-b border-stone-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-600/30 border border-indigo-400/50 flex items-center justify-center text-xl text-indigo-300">
+                  🤖
+                </div>
+                <div>
+                  <h3 className="font-fantasy text-lg font-bold text-white">
+                    How AI Works in This Game
+                  </h3>
+                  <span className="text-xs text-indigo-300">
+                    Powered by Google Gemini 2.5 Flash
+                  </span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setIsHowAIWorksOpen(false)}
+                className="p-1.5 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs text-stone-300 leading-relaxed">
+              <div className="p-3.5 rounded-2xl bg-stone-950/80 border border-stone-800">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-base">📸</span>
+                  <h4 className="font-bold text-amber-300 text-sm">
+                    1. Real-World Vision & Scene Understanding
+                  </h4>
+                </div>
+                <p className="text-stone-300">
+                  Gemini analyzes each real photograph (like the Swiss Alps, Kyoto Pagodas, or Venice Canals) to identify geographic coordinates, natural features, architectural landmarks, and time-of-day lighting.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-stone-950/80 border border-stone-800">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-base">🧩</span>
+                  <h4 className="font-bold text-cyan-300 text-sm">
+                    2. Dynamic Lore & Strategy Generation
+                  </h4>
+                </div>
+                <p className="text-stone-300">
+                  When you tap <strong>"Ask AI for Photo Lore"</strong>, Gemini produces contextual historical background and smart human-tailored solving advice (e.g. matching horizons, tree lines, or water reflections).
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-stone-950/80 border border-stone-800">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-base">🧠</span>
+                  <h4 className="font-bold text-emerald-300 text-sm">
+                    3. Real-Time Interactive AI Oracle
+                  </h4>
+                </div>
+                <p className="text-stone-300">
+                  Tap the <BrainCircuit className="w-3.5 h-3.5 inline text-indigo-400" /> icon anytime to query the AI Oracle directly for hints, strategies, and lore about any level across all games!
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setIsHowAIWorksOpen(false)}
+              className="mt-6 w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold text-xs uppercase tracking-wide cursor-pointer shadow-lg"
+            >
+              Got it, Let's Play!
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Victory Celebration Modal */}
       <VictoryModal

@@ -43,13 +43,16 @@ export const TreasureHuntHub: React.FC<TreasureHuntHubProps> = ({
           </button>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xl">🧭</span>
-              <h1 className="font-fantasy text-2xl sm:text-3xl font-extrabold text-white tracking-wide">
-                TREASURE HUNT
+              <span className="text-xl">👑</span>
+              <h1 className="font-fantasy text-2xl sm:text-3xl font-extrabold text-amber-300 tracking-wide uppercase">
+                VILLAGE TREASURE
               </h1>
+              <span className="px-2 py-0.5 rounded-lg bg-blue-600 text-white font-black text-xs tracking-wider uppercase">
+                GUARD HUNT
+              </span>
             </div>
             <p className="text-xs sm:text-sm text-slate-400">
-              15 Worlds · 150 Adventure Quests · {progress.completedLevels.length}/150 Discovered
+              Hunt the Treasure. Outrun the Guards! · 15 Villages · 150 Quests · {progress.completedLevels.length}/150 Discovered
             </p>
           </div>
         </div>

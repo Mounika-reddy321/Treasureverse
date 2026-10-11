@@ -12,8 +12,8 @@ import {
   Heart,
   Undo2,
   BrainCircuit,
-  AlertCircle,
-  HelpCircle,
+  Sparkles,
+  CheckCircle2,
 } from 'lucide-react';
 
 interface ArrowGamePlayProps {
@@ -36,15 +36,17 @@ export const ArrowGamePlay: React.FC<ArrowGamePlayProps> = ({
   onNextLevel,
 }) => {
   const [arrows, setArrows] = useState<ArrowItem[]>([]);
-  const [hearts, setHearts] = useState<number>(3);
+  const [hearts, setHearts] = useState<number>(5);
   const [blockedArrowId, setBlockedArrowId] = useState<string | null>(null);
+  const [blockerHighlightId, setBlockerHighlightId] = useState<string | null>(null);
   const [flyingArrowIds, setFlyingArrowIds] = useState<Set<string>>(new Set());
   const [highlightedArrowId, setHighlightedArrowId] = useState<string | null>(null);
-  const [hintStock, setHintStock] = useState<number>(3);
+  const [hintStock, setHintStock] = useState<number>(5);
   const [isGameOver, setIsGameOver] = useState<boolean>(false);
   const [isAIModalOpen, setIsAIModalOpen] = useState<boolean>(false);
   const [blockedToast, setBlockedToast] = useState<string | null>(null);
   const [isLevelCleared, setIsLevelCleared] = useState<boolean>(false);
+  const [showEscapeGlow, setShowEscapeGlow] = useState<boolean>(true);
 
   // Victory modal
   const [victoryState, setVictoryState] = useState<{
@@ -69,8 +71,9 @@ export const ArrowGamePlay: React.FC<ArrowGamePlayProps> = ({
   const initLevel = () => {
     const cloned = level.arrows.map((a) => ({ ...a, state: 'ready' as const }));
     setArrows(cloned);
-    setHearts(3);
+    setHearts(5);
     setBlockedArrowId(null);
+    setBlockerHighlightId(null);
     setFlyingArrowIds(new Set());
     setHighlightedArrowId(null);
     setIsGameOver(false);
@@ -87,8 +90,32 @@ export const ArrowGamePlay: React.FC<ArrowGamePlayProps> = ({
 
   const remainingArrows = arrows.filter((a) => a.state !== 'cleared').length;
 
+  // Find which arrow is blocking a given arrow (for helpful hints)
+  const findBlockingArrow = (arrow: ArrowItem): ArrowItem | null => {
+    const pt = arrow.path[0];
+    let dr = 0;
+    let dc = 0;
+    if (arrow.dir === 'UP') dr = -1;
+    else if (arrow.dir === 'RIGHT') dc = 1;
+    else if (arrow.dir === 'DOWN') dr = 1;
+    else if (arrow.dir === 'LEFT') dc = -1;
+
+    let r = pt.r + dr;
+    let c = pt.c + dc;
+
+    while (r >= 0 && r < level.height && c >= 0 && c < level.width) {
+      const blocker = arrows.find(
+        (other) => other.id !== arrow.id && other.state !== 'cleared' && other.path.some((p) => p.r === r && p.c === c)
+      );
+      if (blocker) return blocker;
+      r += dr;
+      c += dc;
+    }
+    return null;
+  };
+
   const handleArrowTap = (arrow: ArrowItem) => {
-    if (arrow.state === 'cleared' || flyingArrowIds.has(arrow.id) || isGameOver) return;
+    if (arrow.state === 'cleared' || flyingArrowIds.has(arrow.id) || isGameOver || isLevelCleared) return;
 
     // Check if runway is clear
     const free = isArrowPathUnobstructed(arrow, arrows, level.width, level.height);
@@ -98,6 +125,7 @@ export const ArrowGamePlay: React.FC<ArrowGamePlayProps> = ({
         setHighlightedArrowId(null);
       }
       setBlockedToast(null);
+      setBlockerHighlightId(null);
 
       // Record history
       setHistory((prev) => [...prev, arrows.map((a) => ({ ...a }))]);
@@ -105,10 +133,10 @@ export const ArrowGamePlay: React.FC<ArrowGamePlayProps> = ({
       // Sound effect
       sounds.playArrowShoot();
 
-      // Trigger physical launch animation!
+      // Physical launch animation
       setFlyingArrowIds((prev) => new Set([...prev, arrow.id]));
 
-      // After 350ms flight animation completes, mark cleared
+      // Clear after flight animation
       setTimeout(() => {
         setFlyingArrowIds((prev) => {
           const next = new Set(prev);
@@ -126,14 +154,23 @@ export const ArrowGamePlay: React.FC<ArrowGamePlayProps> = ({
         if (stillActive.length === 0) {
           handleVictory();
         }
-      }, 350);
+      }, 320);
     } else {
-      // Collision / Blocked!
+      // Collision / Blocked recoil animation!
       sounds.playArrowBlocked();
       setBlockedArrowId(arrow.id);
-      setBlockedToast(`⚠️ That arrow is blocked in the ${arrow.dir.toLowerCase()} direction! Try a perimeter arrow.`);
+
+      // Find the blocker to show the player
+      const blocker = findBlockingArrow(arrow);
+      if (blocker) {
+        setBlockerHighlightId(blocker.id);
+        setTimeout(() => setBlockerHighlightId(null), 1800);
+      }
+
+      setBlockedToast(`⚠️ Blocked by another arrow in the ${arrow.dir.toLowerCase()} path! Tap an edge arrow first.`);
       setTimeout(() => setBlockedArrowId(null), 500);
 
+      // Deduct heart
       const nextHearts = hearts - 1;
       setHearts(nextHearts);
       if (nextHearts <= 0) {
@@ -145,7 +182,7 @@ export const ArrowGamePlay: React.FC<ArrowGamePlayProps> = ({
   const handleVictory = () => {
     sounds.playLevelComplete();
     setIsLevelCleared(true);
-    const stars = hearts === 3 ? 3 : hearts === 2 ? 2 : 1;
+    const stars = hearts >= 4 ? 3 : hearts >= 2 ? 2 : 1;
     const { newlyCompleted, diamondsEarned } = onCompleteLevel(
       stars,
       800 + hearts * 100,
@@ -159,10 +196,10 @@ export const ArrowGamePlay: React.FC<ArrowGamePlayProps> = ({
         diamondsEarned,
         isFirstTime: newlyCompleted,
       });
-    }, 400);
+    }, 450);
   };
 
-  // Lightbulb Hint handler
+  // Lightbulb Hint: highlights a guaranteed free escape arrow
   const handleUseHint = () => {
     sounds.playClick();
     const freeArrow = arrows.find(
@@ -174,9 +211,9 @@ export const ArrowGamePlay: React.FC<ArrowGamePlayProps> = ({
       setHighlightedArrowId(freeArrow.id);
       setHintStock((h) => Math.max(0, h - 1));
       setBlockedToast(`💡 Hint: The glowing gold arrow is ready to fly!`);
-      setTimeout(() => setHighlightedArrowId(null), 4000);
+      setTimeout(() => setHighlightedArrowId(null), 4500);
     } else {
-      setBlockedToast(`All perimeter arrows are being checked... Look along the outer boundary!`);
+      setBlockedToast(`Checking all perimeter arrows... Look along the outer boundary!`);
     }
   };
 
@@ -189,30 +226,26 @@ export const ArrowGamePlay: React.FC<ArrowGamePlayProps> = ({
     setHistory((prev) => prev.slice(0, -1));
   };
 
-  // Revive with diamonds
+  // Revive with free retry or diamonds
   const handleRevive = () => {
-    if (diamonds < 20) return;
-    const success = onSpendDiamonds(20, 'Revive Lives in Arrow Puzzle');
-    if (success) {
-      sounds.playGemCollect();
-      setHearts(3);
-      setIsGameOver(false);
-    }
+    sounds.playGemCollect();
+    setHearts(5);
+    setIsGameOver(false);
   };
 
   const cellSize = 36;
-  const padding = 24;
+  const padding = 28;
   const svgW = level.width * cellSize + padding * 2;
   const svgH = level.height * cellSize + padding * 2;
 
   return (
-    <div className="max-w-md mx-auto px-4 py-3 min-h-[92vh] flex flex-col justify-between bg-slate-950 text-slate-100 select-none animate-fade-in">
+    <div className="max-w-md mx-auto px-4 py-3 min-h-[92vh] flex flex-col justify-between bg-slate-950 text-slate-100 select-none animate-fade-in pb-16">
       
       {/* 1. Header Bar */}
       <div className="flex items-center justify-between pb-2 border-b border-slate-800">
         <button
           onClick={() => { sounds.playClick(); onBackToHub(); }}
-          className="p-2 -ml-2 text-slate-400 hover:text-white transition-colors"
+          className="p-2 -ml-2 text-slate-400 hover:text-white transition-colors cursor-pointer"
           aria-label="Back"
         >
           <ChevronLeft className="w-6 h-6" />
@@ -227,15 +260,15 @@ export const ArrowGamePlay: React.FC<ArrowGamePlayProps> = ({
           </span>
         </div>
 
-        {/* Lives (3 Hearts) */}
+        {/* Lives (5 Hearts) */}
         <div className="flex items-center gap-1">
-          {[1, 2, 3].map((h) => (
+          {[1, 2, 3, 4, 5].map((h) => (
             <Heart
               key={h}
-              className={`w-5 h-5 transition-all ${
+              className={`w-4 h-4 transition-all ${
                 h <= hearts
                   ? 'text-red-500 fill-red-500 scale-100'
-                  : 'text-slate-700 fill-slate-800 scale-90'
+                  : 'text-slate-700 fill-slate-850 scale-90'
               }`}
             />
           ))}
@@ -257,17 +290,30 @@ export const ArrowGamePlay: React.FC<ArrowGamePlayProps> = ({
           {/* AI Oracle Shortcut */}
           <button
             onClick={() => { sounds.playClick(); setIsAIModalOpen(true); }}
-            className="p-1.5 rounded-lg bg-indigo-950/60 border border-indigo-700/60 text-indigo-300 hover:text-white transition-colors"
+            className="p-1.5 rounded-lg bg-indigo-950/60 border border-indigo-700/60 text-indigo-300 hover:text-white transition-colors cursor-pointer"
             title="Ask AI Oracle for Pathfinding"
           >
             <BrainCircuit className="w-4 h-4" />
+          </button>
+
+          {/* Toggle Free Escape Glow */}
+          <button
+            onClick={() => setShowEscapeGlow((prev) => !prev)}
+            className={`p-1.5 rounded-lg border text-xs font-bold transition-colors cursor-pointer ${
+              showEscapeGlow
+                ? 'bg-amber-500/20 border-amber-400/50 text-amber-300'
+                : 'bg-slate-900 border-slate-800 text-slate-400'
+            }`}
+            title="Toggle Escape Guidance Glow"
+          >
+            <Sparkles className="w-4 h-4" />
           </button>
 
           {/* Undo */}
           <button
             onClick={handleUndo}
             disabled={history.length === 0}
-            className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-white disabled:opacity-40 transition-colors"
+            className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-white disabled:opacity-40 transition-colors cursor-pointer"
             title="Undo last move"
           >
             <Undo2 className="w-4 h-4" />
@@ -276,7 +322,7 @@ export const ArrowGamePlay: React.FC<ArrowGamePlayProps> = ({
           {/* Reset */}
           <button
             onClick={initLevel}
-            className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition-colors"
+            className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
             title="Reset Level"
           >
             <RotateCcw className="w-4 h-4" />
@@ -286,16 +332,16 @@ export const ArrowGamePlay: React.FC<ArrowGamePlayProps> = ({
 
       {/* Blocked / Feedback Alert Toast */}
       {blockedToast && (
-        <div className="bg-amber-950/60 border border-amber-500/40 text-amber-200 text-xs px-3 py-1.5 rounded-xl text-center mb-1 animate-fade-in">
+        <div className="bg-amber-950/60 border border-amber-500/40 text-amber-200 text-xs px-3 py-1.5 rounded-xl text-center mb-1 animate-fade-in shadow-md">
           {blockedToast}
         </div>
       )}
 
-      {/* 3. Interactive Arrow Board with Physical Flight Animations */}
+      {/* 3. Interactive Arrow Board with Reliable Clicks & Launch Physics */}
       <div className="relative my-auto flex items-center justify-center bg-slate-900/90 rounded-3xl border-2 border-slate-800 shadow-2xl p-2 overflow-hidden min-h-[460px]">
         
-        {/* Subtle shape outline background */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(99,102,241,0.06)_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none" />
+        {/* Subtle grid background */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(99,102,241,0.08)_1px,transparent_1px)] bg-[size:18px_18px] pointer-events-none" />
 
         <svg
           viewBox={`0 0 ${svgW} ${svgH}`}
@@ -340,13 +386,15 @@ export const ArrowGamePlay: React.FC<ArrowGamePlayProps> = ({
             </marker>
           </defs>
 
-          {/* Render each arrow with flight transform styles */}
+          {/* Render each arrow with guaranteed click capture */}
           {arrows.map((arrow) => {
             if (arrow.state === 'cleared') return null;
 
             const isFlying = flyingArrowIds.has(arrow.id);
             const isBlocked = blockedArrowId === arrow.id;
-            const isHighlighted = highlightedArrowId === arrow.id;
+            const isBlocker = blockerHighlightId === arrow.id;
+            const isHinted = highlightedArrowId === arrow.id;
+            const isFree = showEscapeGlow && isArrowPathUnobstructed(arrow, arrows, level.width, level.height);
 
             const pt = arrow.path[0];
             const centerX = padding + pt.c * cellSize + cellSize / 2;
@@ -376,26 +424,27 @@ export const ArrowGamePlay: React.FC<ArrowGamePlayProps> = ({
             // Flight animation offset
             let flightTransform = '';
             if (isFlying) {
-              if (arrow.dir === 'UP') flightTransform = 'translate(0px, -900px)';
-              else if (arrow.dir === 'DOWN') flightTransform = 'translate(0px, 900px)';
-              else if (arrow.dir === 'LEFT') flightTransform = 'translate(-900px, 0px)';
-              else if (arrow.dir === 'RIGHT') flightTransform = 'translate(900px, 0px)';
+              if (arrow.dir === 'UP') flightTransform = 'translate(0px, -800px)';
+              else if (arrow.dir === 'DOWN') flightTransform = 'translate(0px, 800px)';
+              else if (arrow.dir === 'LEFT') flightTransform = 'translate(-800px, 0px)';
+              else if (arrow.dir === 'RIGHT') flightTransform = 'translate(800px, 0px)';
             } else if (isBlocked) {
-              if (arrow.dir === 'UP') flightTransform = 'translate(0px, -6px)';
-              else if (arrow.dir === 'DOWN') flightTransform = 'translate(0px, 6px)';
-              else if (arrow.dir === 'LEFT') flightTransform = 'translate(-6px, 0px)';
-              else if (arrow.dir === 'RIGHT') flightTransform = 'translate(6px, 0px)';
+              // Physical bump into blocker
+              if (arrow.dir === 'UP') flightTransform = 'translate(0px, -8px)';
+              else if (arrow.dir === 'DOWN') flightTransform = 'translate(0px, 8px)';
+              else if (arrow.dir === 'LEFT') flightTransform = 'translate(-8px, 0px)';
+              else if (arrow.dir === 'RIGHT') flightTransform = 'translate(8px, 0px)';
             }
 
-            const marker = isBlocked
+            const marker = isBlocked || isBlocker
               ? 'url(#arrowhead-red)'
-              : isHighlighted
+              : isHinted || isFree
               ? 'url(#arrowhead-gold)'
               : 'url(#arrowhead-white)';
 
-            const strokeColor = isBlocked
+            const strokeColor = isBlocked || isBlocker
               ? '#ef4444'
-              : isHighlighted
+              : isHinted || isFree
               ? '#f59e0b'
               : '#ffffff';
 
@@ -406,19 +455,21 @@ export const ArrowGamePlay: React.FC<ArrowGamePlayProps> = ({
                 style={{
                   transform: flightTransform,
                   transition: isFlying
-                    ? 'transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.35s ease-out'
+                    ? 'transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.32s ease-out'
                     : 'transform 0.15s ease-out',
                   opacity: isFlying ? 0 : 1,
                   cursor: isFlying ? 'default' : 'pointer',
+                  pointerEvents: 'all',
                 }}
-                className="group"
+                className="group cursor-pointer select-none"
               >
-                {/* Thick circular hit target for reliable taps */}
+                {/* Large generous hit target with explicit pointerEvents="all" */}
                 <circle
                   cx={centerX}
                   cy={centerY}
-                  r="16"
-                  fill="transparent"
+                  r="18"
+                  fill="#00000001"
+                  pointerEvents="all"
                   className="cursor-pointer"
                 />
 
@@ -426,10 +477,11 @@ export const ArrowGamePlay: React.FC<ArrowGamePlayProps> = ({
                 <circle
                   cx={centerX}
                   cy={centerY}
-                  r="13"
-                  fill={isHighlighted ? '#f59e0b20' : '#1e293b50'}
-                  stroke={isHighlighted ? '#f59e0b80' : '#334155'}
-                  strokeWidth="1.2"
+                  r="14"
+                  fill={isHinted ? '#f59e0b35' : isFree ? '#f59e0b18' : isBlocker ? '#ef444430' : '#1e293b50'}
+                  stroke={isHinted ? '#f59e0b' : isFree ? '#f59e0b80' : isBlocker ? '#ef4444' : '#334155'}
+                  strokeWidth={isHinted || isFree ? '1.8' : '1.2'}
+                  pointerEvents="all"
                   className="transition-colors group-hover:fill-slate-700"
                 />
 
@@ -440,9 +492,10 @@ export const ArrowGamePlay: React.FC<ArrowGamePlayProps> = ({
                   x2={endX}
                   y2={endY}
                   stroke={strokeColor}
-                  strokeWidth={isHighlighted ? '3.5' : '2.8'}
+                  strokeWidth={isHinted ? '3.5' : isFree ? '3' : '2.8'}
                   strokeLinecap="round"
                   markerEnd={marker}
+                  pointerEvents="all"
                 />
               </g>
             );
@@ -455,23 +508,22 @@ export const ArrowGamePlay: React.FC<ArrowGamePlayProps> = ({
             <div className="w-16 h-16 rounded-full bg-red-500/20 border border-red-500 text-red-400 flex items-center justify-center text-3xl mb-3 shadow-inner">
               💔
             </div>
-            <h3 className="text-xl font-bold text-white mb-1">Out of Lives!</h3>
+            <h3 className="text-xl font-bold text-white mb-1">Hearts Depleted!</h3>
             <p className="text-xs text-slate-400 mb-6 max-w-xs">
-              Collided with blocked arrows 3 times. Revive with 3 hearts to continue, or restart the level!
+              Look for the gold-glowing arrows pointing toward open perimeter space! Revive for free to keep playing.
             </p>
 
             <div className="flex flex-col gap-2.5 w-full max-w-xs">
               <button
                 onClick={handleRevive}
-                disabled={diamonds < 20}
-                className="w-full py-3 px-4 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-1.5 disabled:opacity-40"
+                className="w-full py-3 px-4 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer uppercase"
               >
-                <span>Revive 3 Lives (20 💎)</span>
+                <span>Revive 5 Hearts & Continue</span>
               </button>
 
               <button
                 onClick={initLevel}
-                className="w-full py-2.5 px-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition-colors"
+                className="w-full py-2.5 px-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition-colors cursor-pointer"
               >
                 Restart Level
               </button>
@@ -486,7 +538,7 @@ export const ArrowGamePlay: React.FC<ArrowGamePlayProps> = ({
         <button
           onClick={handleUseHint}
           className="relative w-16 h-16 rounded-full bg-slate-900 border-2 border-slate-700 shadow-xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all group cursor-pointer"
-          title="Lightbulb Hint: Highlights a free arrow"
+          title="Lightbulb Hint: Reveals a free escape arrow"
           aria-label="Hint"
         >
           <div className="w-11 h-11 rounded-full bg-slate-950 flex items-center justify-center group-hover:bg-amber-950/60 transition-colors">
@@ -560,14 +612,19 @@ export const ArrowGamePlay: React.FC<ArrowGamePlayProps> = ({
         stars={victoryState.stars}
         diamondsEarned={victoryState.diamondsEarned}
         isFirstTime={victoryState.isFirstTime}
-        movesOrTimeText={`${level.arrows.length - remainingArrows} moves`}
+        movesOrTimeText={`${hearts} hearts preserved`}
         onReplay={initLevel}
         onNextLevel={() => {
           setVictoryState((v) => ({ ...v, isOpen: false }));
           onNextLevel();
         }}
-        onBackToHub={onBackToHub}
-        onClose={() => setVictoryState((v) => ({ ...v, isOpen: false }))}
+        onBackToHub={() => {
+          setVictoryState((v) => ({ ...v, isOpen: false }));
+          onBackToHub();
+        }}
+        onClose={() => {
+          setVictoryState((v) => ({ ...v, isOpen: false }));
+        }}
         hasNextLevel={level.level < 150}
       />
 
